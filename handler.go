@@ -3,7 +3,7 @@ package gzip
 import (
 	"compress/gzip"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -21,8 +21,8 @@ func newGzipHandler(level int, options ...Option) *gzipHandler {
 	handler := &gzipHandler{
 		Options: DefaultOptions,
 		gzPool: sync.Pool{
-			New: func() interface{} {
-				gz, err := gzip.NewWriterLevel(ioutil.Discard, level)
+			New: func() any {
+				gz, err := gzip.NewWriterLevel(io.Discard, level)
 				if err != nil {
 					panic(err)
 				}
@@ -42,12 +42,13 @@ func (g *gzipHandler) Handle(c *gin.Context) {
 	}
 
 	if !g.shouldCompress(c.Request) {
+		c.Next()
 		return
 	}
 
 	gz := g.gzPool.Get().(*gzip.Writer)
 	defer g.gzPool.Put(gz)
-	defer gz.Reset(ioutil.Discard)
+	defer gz.Reset(io.Discard)
 	gz.Reset(c.Writer)
 
 	c.Header("Content-Encoding", "gzip")
